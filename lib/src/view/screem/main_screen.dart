@@ -1,4 +1,5 @@
 import 'package:bloc_pattern/bloc_pattern.dart';
+import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
 import 'package:flutter/material.dart';
 import 'package:pokedex_flutter/app_config.dart';
 import 'package:pokedex_flutter/src/bloc/main_bloc.dart';
@@ -13,12 +14,39 @@ class MainScreen extends StatefulWidget {
   _MainScreenState createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
+class _MainScreenState extends State<MainScreen>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   bool selectedItemType = false;
   final GlobalKey<CustomExpansionTileState> keyTileType = new GlobalKey();
   final GlobalKey<CustomExpansionTileState> keyTilePokemon = new GlobalKey();
   final PageController _controller =
-      new PageController(initialPage: 0, viewportFraction: 1.0);
+      PageController(initialPage: 0, viewportFraction: 1.0);
+
+  @override
+  void initState() {
+    WidgetsBinding.instance.addObserver(this);
+     Future.delayed(Duration(seconds: 1), () {
+        _retrieveDynamicLink();
+      });
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      Future.delayed(Duration(seconds: 1), () {
+        _retrieveDynamicLink();
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -50,6 +78,28 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
             ],
           )),
     ));
+  }
+
+  Future<void> _retrieveDynamicLink() async {
+    final PendingDynamicLinkData data =
+        await FirebaseDynamicLinks.instance.retrieveDynamicLink();
+    final Uri deepLink = data?.link;
+
+    if (deepLink != null) {
+      if (deepLink.authority == "podekex.com") {
+        for (var item in deepLink.queryParameters.keys) {
+          if (item == "pdx") {
+            final namePok = deepLink.queryParameters[item];
+            print(namePok);
+            BlocProvider.of<MainBloc>(context).loadInfoPokemons(namePok);
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => PokedexScreen()),
+            );
+          }
+        }
+      }
+    }
   }
 
   streamBuilderListType() {
@@ -84,7 +134,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     );
   }
 
-  ListView _buildListViewType(AsyncSnapshot<List<TypeDto>> snap) {
+  Widget _buildListViewType(AsyncSnapshot<List<TypeDto>> snap) {
     return ListView.builder(
       itemCount: snap.data.length,
       itemBuilder: (context, index) {
@@ -93,7 +143,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     );
   }
 
-  ListView _buildListViewPokemon(AsyncSnapshot<List<PokemonDto>> snap) {
+  Widget _buildListViewPokemon(AsyncSnapshot<List<PokemonDto>> snap) {
     return ListView.builder(
       itemCount: snap.data.length,
       itemBuilder: (context, index) {
@@ -102,13 +152,13 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     );
   }
 
-  Center _buildErrorMessage(BuildContext context, String text) {
+  Widget _buildErrorMessage(BuildContext context, String text) {
     return Center(
         child:
             Text(text, style: AppConfig.of(context).appTheme.textTheme.title));
   }
 
-  Container _buildImageBackground(String imageAddress) {
+  Widget _buildImageBackground(String imageAddress) {
     return Container(
       decoration: BoxDecoration(
         image: DecorationImage(
@@ -193,7 +243,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     );
   }
 
-  Padding buildContainerDecorator(Widget child) {
+  Widget buildContainerDecorator(Widget child) {
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 150, 20, 40),
       child: Container(
