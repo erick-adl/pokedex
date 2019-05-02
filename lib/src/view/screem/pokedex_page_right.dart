@@ -1,4 +1,5 @@
 import 'package:bloc_pattern/bloc_pattern.dart';
+import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
 import 'package:flutter/material.dart';
 import 'package:pokedex_flutter/app_config.dart';
 import 'package:pokedex_flutter/src/bloc/main_bloc.dart';
@@ -75,6 +76,7 @@ class PokedexPageRightState extends State<PokedexPageRight> {
 
   _shareInfo(BuildContext context) async {
     var pokemon = BlocProvider.of<MainBloc>(context).pokemonModel;
+    final url = await _createDynamicLink(pokemon.name);
     if (pokemon != null) {
       var buffer = new StringBuffer();
       buffer.write("\nName: ${pokemon.name}");
@@ -86,8 +88,37 @@ class PokedexPageRightState extends State<PokedexPageRight> {
           buffer.write("\n${item.ability.name}");
         }
       }
+      buffer.write("\n\nView in: ${url.toString()}");
       Share.share(buffer.toString());
     }    
+  }
+
+  Future<Uri> _createDynamicLink(String name,{bool short = true}) async {
+    final DynamicLinkParameters parameters = DynamicLinkParameters(
+      domain: 'pokedexflutter.page.link',
+      link: Uri.parse("https://podekex.com/?pdx=$name"),
+      androidParameters: AndroidParameters(
+        packageName: 'com.erick.pokedexflutter',
+        minimumVersion: 0,
+      ),
+      dynamicLinkParametersOptions: DynamicLinkParametersOptions(
+        shortDynamicLinkPathLength: ShortDynamicLinkPathLength.short,
+      ),
+      iosParameters: IosParameters(
+        bundleId: 'com.erick.pokedexflutter',
+        minimumVersion: '0',
+      ),
+    );
+
+    Uri url;
+    if (short) {
+      final ShortDynamicLink shortLink = await parameters.buildShortLink();
+      url = shortLink.shortUrl;
+    } else {
+      url = await parameters.buildUrl();
+    }
+    print(url);
+    return url;
   }
 
   Padding _buildContainerInfos() {
